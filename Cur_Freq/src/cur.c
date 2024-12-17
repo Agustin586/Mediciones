@@ -14,6 +14,7 @@ typedef struct flipflop_D
     bool Q;
     bool Qn;
     bool D;
+    bool FallEdge;
 } flipflop_D;
 
 typedef uint32_t T_Cont;   // Variable de tipo contador --> Puede ser cambiada si necesitamos mayor valor.
@@ -26,6 +27,7 @@ typedef struct DecDivN
     T_Cont Cont;
     T_FreqIN Fin;
     T_FreqOut Fout;
+    bool RiseEdge;
     bool Q;
 } DecDivN;
 
@@ -142,6 +144,7 @@ static void flipflop_init(flipflop_D *flipflop, bool Q, bool Qn, bool D)
     flipflop->D = D;
     flipflop->Q = Q;
     flipflop->Qn = Qn;
+    flipflop->FallEdge = false;
 
     return;
 }
@@ -151,6 +154,7 @@ static void flipflop_reset(flipflop_D *flipflop)
     flipflop->D = 0;
     flipflop->Q = 0;
     flipflop->Qn = 1;
+    flipflop->FallEdge = false;
 
     return;
 }
@@ -158,6 +162,11 @@ static void flipflop_reset(flipflop_D *flipflop)
 static void flipflop(flipflop_D *flipflop, bool D)
 {
     flipflop->D = D;
+
+    // Detecta el flaco descendente
+    if (flipflop->Q == 1 && D == 0)
+        flipflop->FallEdge = true;
+
     flipflop->Q = flipflop->D;
     flipflop->Qn = !flipflop->Q;
 
@@ -172,6 +181,7 @@ static void DecadaDiv_init(DecDivN *DecDiv, T_Cont N, T_FreqIN Fin, T_FreqOut Fo
     DecDiv->Fin = Fin;
     DecDiv->Fout = Fout;
     DecDiv->Q = false;
+    DecDiv->RiseEdge = false;
 
     return;
 }
@@ -180,12 +190,28 @@ static void DecadaDiv(DecDivN *DecDiv)
 {
     DecDiv->Cont--;
 
-    if (!DecDiv->Cont)
+    if (!DecDiv->Cont) // Cuando cont = 0
     {
-        DecDiv->Cont = DecDiv->N;
-        DecDiv->Q = !DecDiv->Q;
-        // printf("Toggle Dec Div\n");
+        DecDiv->Cont = DecDiv->N; // Reincia
+
+        if (DecDiv->Q == 0)
+            DecDiv->RiseEdge = true; // Flanco ascendente habilitado
+
+        DecDiv->Q = !DecDiv->Q; // Togglea la salida
+
+        // printf("Nr:%d\n", ContUniRev.Nr.Cont);
     }
+
+    // /* Ensayo: fr y fn */ // Chequeado
+    // if (DecDiv->Q)
+    // {
+    //     gpio_put(7, true);
+    // }
+    // else
+    // {
+    //     gpio_put(7, false);
+    // }
+    // /*----------------*/
 
     return;
 }
@@ -220,27 +246,46 @@ static void Temp_init(void)
     uint16_t delay_us = FREQ_Fr / 1000;
     bool status = add_repeating_timer_us(10, Temp_Fr_callback, NULL, &timer_Fr);
 
-    printf("Estado del temporizador: %s\n", status ? "Exitoso" : "Fallido");
+    // printf("Estado del temporizador: %s\n", status ? "Exitoso" : "Fallido");
 
     return;
 }
 /*.....................................................................*/
 bool Temp_Fr_callback(repeating_timer_t *rtimer)
 {
-    if (ContUniRev.FF_2.Q) // AND nro 2
-    {
-        Contador_inc(&ContUniRev.Nr); // Cuentas de Nr
-        // Contador_inc(&ContUniRev.Nm);
-    }
-
-    // printf("Fr");
     DecadaDiv(&ContUniRev.Decada_Div);
 
-    if (ContUniRev.Decada_Div.Q)
+    if (ContUniRev.FF_2.Q) // AND nro 2
+    // if (ContUniRev.FF_1.Q) // Para probar
     {
-        // printf("Toggle FF1\n");
-        flipflop(&ContUniRev.FF_1, ContUniRev.FF_1.Qn); // D se conecta con Qn
+        Contador_inc(&ContUniRev.Nr); // Cuentas de Nr
     }
+
+    // /* Ensayo: verificar fr */
+    // gpio_put(8, !gpio_get(8)); // Chequeado
+    // /*----------------------*/
+
+    if (ContUniRev.Decada_Div.RiseEdge)
+    {
+        flipflop(&ContUniRev.FF_1, ContUniRev.FF_1.Qn); // D se conecta con Qn
+
+        ContUniRev.Decada_Div.RiseEdge = false; // Deshabilita el flanco
+    }
+
+    if (ContUniRev.FF_1.Q)
+    {
+        /* Ensayo: salida del ff1 */ // Chequeado
+        gpio_put(7, true);
+        /*------------------------*/
+    }
+    else
+    {
+        /* Ensayo: salida del ff1 */
+        gpio_put(7, false);
+        /*------------------------*/
+    }
+
+    // DecadaDiv(&ContUniRev.Decada_Div);
 
     return true;
 }
@@ -253,17 +298,26 @@ static void isr_fe(uint gpio, uint32_t events)
 
         flipflop(&ContUniRev.FF_2, ContUniRev.FF_1.Q); // Q1 se conecta a D2
 
-        if (ContUniRev.FF_2.Q)
+        if (ContUniRev.FF_2.Q) // AND 2
+        // if (ContUniRev.FF_1.Q) // Para probar!!
         {
-            //Contador_inc(&ContUniRev.Nm);
-            ContUniRev.Nm.Cont++;
-            // printf("Nm:%d",ContUniRev.Nm);
-            flag = true;
+            /* Ensayo: salida de ff2 */
+            gpio_put(8, true);
+            /*-----------------------*/
+
+            Contador_inc(&ContUniRev.Nm); // Incremento de Nm
+            //  printf("Nm:%d",ContUniRev.Nm.Cont);
         }
 
-        if (ContUniRev.FF_2.Qn && flag)
+        if (ContUniRev.FF_2.FallEdge)
         {
-            Monoestable_set();
+            /* Ensayo: salida de ff2 */
+            gpio_put(8, false);
+            /*-----------------------*/
+
+            Monoestable_set(); // Resetea las variables
+
+            ContUniRev.FF_2.FallEdge = false; // Limpia el flanco descendente
             // printf("Toggle FF2\n");
         }
 
@@ -317,8 +371,6 @@ static void Monoestable_set(void)
     Contador_reset(&ContUniRev.Nm);
     Contador_reset(&ContUniRev.Nr);
 
-    flag = false;
-
     // Activo el temporizador fr
     Temp_init();
 
@@ -333,7 +385,9 @@ static void Monoestable_set(void)
 
 /* CUERPO DE FUNCIONES EXTERNAS */
 /*.....................................................................*/
-#define DECADA_DIV_N 10000
+// #define DECADA_DIV_N 10000
+// #define DECADA_DIV_N 50000
+#define DECADA_DIV_N 5000
 #define DECADA_DIV_FIN 100000
 #define DECADA_DIV_FOUT 10
 
@@ -356,6 +410,12 @@ extern void cur_init(void)
     // Inicialzacion de temporizadores
     Temp_init();
 
+    gpio_init(8);
+    gpio_set_dir(8, GPIO_OUT);
+    gpio_set_slew_rate(8, GPIO_SLEW_RATE_FAST);
+    gpio_init(7);
+    gpio_set_dir(7, GPIO_OUT);
+
     return;
 }
 /*.....................................................................*/
@@ -364,9 +424,10 @@ extern float cur_freq(void)
     // return 124.3;
     float resultado = (float)((ContUniRev.Nm.Cont * 1.0) / ContUniRev.Nr.Cont);
 
-    printf("Nm:%d\t\tNr:%d\n", ContUniRev.Nm, ContUniRev.Nr);
+    printf("Nm:%d\t\tNr:%d\n", ContUniRev.Nm.Cont, ContUniRev.Nr.Cont);
+    // printf("Nr:%d\n", ContUniRev.Nr.Cont);
 
-    printf("%.2f\n", resultado);
+    // printf("%.2f\n", resultado);
 
     return resultado;
 }
