@@ -10,5 +10,9 @@ extern void cur_init(void);
  * @return Valor flotante de frecuencia.
  */
 extern float cur_freq(void);
+/**
+ * @brief Programa del nucleo 1.
+ */
+extern void core1_entry(void);
 
 #endif

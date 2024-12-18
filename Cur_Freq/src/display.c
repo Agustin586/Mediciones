@@ -51,17 +51,19 @@ extern void display_freq(void)
 {
     char buffer[20];
 
+    float dato = cur_freq();
+
     // Limpia la pantalla
-    // lcd_clear();
+    lcd_clear();
 
     // Pantalla principal
-    // lcd_set_cursor(0, 0);
-    // lcd_string("Freq:");
+    lcd_set_cursor(0, 0);
+    lcd_string("Freq:");
 
     // Carga valor de frecuencia
-    // lcd_set_cursor(1, 0);
-    // sprintf(buffer, "%.5f Hz", cur_freq());
-    // lcd_string(buffer);
+    lcd_set_cursor(1, 0);
+    sprintf(buffer, "%.3f Hz", dato);
+    lcd_string(buffer);
 
     return;
 }

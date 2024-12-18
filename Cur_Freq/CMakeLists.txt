@@ -58,6 +58,7 @@ target_link_libraries(Cur_Freq
         hardware_i2c
         hardware_timer
         hardware_clocks
+        pico_multicore
 )
 
 pico_add_extra_outputs(Cur_Freq)

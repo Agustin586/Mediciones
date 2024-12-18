@@ -3,6 +3,7 @@
 #include "hardware/i2c.h"
 #include "hardware/timer.h"
 #include "hardware/clocks.h"
+#include "pico/multicore.h"
 #include "cur.h"
 #include "display.h"
 
@@ -23,6 +24,9 @@ int main()
     display_init();
     ledBlink_init();
     cur_init();
+
+    // Lanza programa en el otro nucleo
+    multicore_launch_core1(core1_entry);
 
     while (true)
     {

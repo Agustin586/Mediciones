@@ -120,7 +120,7 @@ static void DecadaDiv(DecDivN *DecDiv);
  * @brief Funcion de callback del timer Fr.
  * @return Devuelve el valor en tiempo para el proximo periodo.
  */
-bool Temp_Fr_callback(repeating_timer_t *rtimer);
+__attribute__((section(".ramfunc"))) bool Temp_Fr_callback(repeating_timer_t *rtimer);
 /**
  * @brief Inicializacion de los temporizadores.
  */
@@ -135,7 +135,7 @@ static void Monoestable_set(void);
 /**
  * @brief Rutina de interrupcion de la fe (frecuencia de entrada).
  */
-static void isr_fe(uint gpio, uint32_t events);
+__attribute__((section(".ramfunc"))) static void isr_fe(uint gpio, uint32_t events);
 static void configure_gpio2_rising_edge_fast_slew(void);
 
 /* CUERPO DE FUNCIONES INTERNAS */
@@ -251,7 +251,7 @@ static void Temp_init(void)
     return;
 }
 /*.....................................................................*/
-bool Temp_Fr_callback(repeating_timer_t *rtimer)
+__attribute__((section(".ramfunc"))) bool Temp_Fr_callback(repeating_timer_t *rtimer)
 {
     DecadaDiv(&ContUniRev.Decada_Div);
 
@@ -290,7 +290,7 @@ bool Temp_Fr_callback(repeating_timer_t *rtimer)
     return true;
 }
 /*.....................................................................*/
-static void isr_fe(uint gpio, uint32_t events)
+__attribute__((section(".ramfunc"))) static void isr_fe(uint gpio, uint32_t events)
 {
     if (gpio == 2 && (events & GPIO_IRQ_EDGE_RISE))
     {
@@ -314,6 +314,8 @@ static void isr_fe(uint gpio, uint32_t events)
             /* Ensayo: salida de ff2 */
             gpio_put(8, false);
             /*-----------------------*/
+
+            multicore_fifo_push_blocking(ContUniRev.FF_2.FallEdge);
 
             Monoestable_set(); // Resetea las variables
 
@@ -424,11 +426,23 @@ extern float cur_freq(void)
     // return 124.3;
     float resultado = (float)((ContUniRev.Nm.Cont * 1.0) / ContUniRev.Nr.Cont);
 
-    printf("Nm:%d\t\tNr:%d\n", ContUniRev.Nm.Cont, ContUniRev.Nr.Cont);
+    // printf("Nm:%d\t\tNr:%d\n", ContUniRev.Nm.Cont, ContUniRev.Nr.Cont);
     // printf("Nr:%d\n", ContUniRev.Nr.Cont);
 
-    // printf("%.2f\n", resultado);
+    // printf("%.2f\n", resultado*100000.0);
 
-    return resultado;
+    return resultado*100000.0;
 }
 /*.....................................................................*/
+
+extern void core1_entry(void)
+{
+    while (1)
+    {
+        uint32_t data = multicore_fifo_pop_blocking();
+        if (data)
+            display_freq();
+    }
+    
+    return;
+}
