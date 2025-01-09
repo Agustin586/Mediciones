@@ -51,7 +51,7 @@ extern void display_freq(void)
 {
     char buffer[20];
 
-    float dato = cur_freq();
+    float dato = cur_freq()*0.9;
 
     // Limpia la pantalla
     lcd_clear();
