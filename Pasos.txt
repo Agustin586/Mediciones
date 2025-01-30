@@ -1,0 +1,14 @@
+Pasos:
+
+- Vericar el modulo de captura para la rpi pico
+	- Configurarlo para flanco ascendente de fe.
+- Rutina de isr para fr y fe
+	- fr = 100Khz, fe entrada
+	- Rutina de fr --> Contador de cuentas de referencia, y armado de fn
+	- Rutina de fe --> Contador de cuentas de incognita, y resultado
+- Temporizador
+	- Configurarlo 100Khz
+	- isr
+- Mef para display
+	- Inicializarlo
+	- Refrescar los valores de pantalla --> Podría ir dentro de la isr fe del else. Ejecuta cada 200ms.
